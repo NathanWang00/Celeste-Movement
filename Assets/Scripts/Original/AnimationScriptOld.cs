@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AnimationScript : MonoBehaviour
+public class AnimationScriptOld : MonoBehaviour
 {
 
     private Animator anim;
-    private Movement move;
+    private MovementOld move;
     private Collision coll;
     [HideInInspector]
     public SpriteRenderer sr;
@@ -15,7 +15,7 @@ public class AnimationScript : MonoBehaviour
     {
         anim = GetComponent<Animator>();
         coll = GetComponentInParent<Collision>();
-        move = GetComponentInParent<Movement>();
+        move = GetComponentInParent<MovementOld>();
         sr = GetComponent<SpriteRenderer>();
     }
 

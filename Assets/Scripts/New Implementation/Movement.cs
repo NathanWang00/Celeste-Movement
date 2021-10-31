@@ -6,7 +6,7 @@ using DG.Tweening;
 
 public class Movement : MonoBehaviour
 {
-    private Collision coll;
+    private CollisionNew coll;
     [HideInInspector]
     public Rigidbody2D rb;
     private AnimationScript anim;
@@ -18,14 +18,20 @@ public class Movement : MonoBehaviour
     public float slideSpeed = 5;
     public float wallJumpLerp = 10;
     public float dashSpeed = 20;
+    public float bufferTime = 1;
+    public float coyoteTime = 1;
 
     [Space]
     [Header("Booleans")]
     public bool canMove;
+    public bool jumpBuffer = false;
+    public bool coyoteBuffer = false;
+    public bool coyoteTriggered = false;
     public bool wallGrab;
     public bool wallJumped;
     public bool wallSlide;
     public bool isDashing;
+    public bool hasJumped = false;
 
     [Space]
 
@@ -44,9 +50,9 @@ public class Movement : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        coll = GetComponent<Collision>();
+        coll = GetComponent<CollisionNew>();
         rb = GetComponent<Rigidbody2D>();
-        anim = GetComponentInChildren<AnimationScript>();
+        anim = GetComponent<AnimationScript>();
     }
 
     // Update is called once per frame
@@ -96,7 +102,7 @@ public class Movement : MonoBehaviour
             rb.gravityScale = 3;
         }
 
-        if(coll.onWall && !coll.onGround)
+        if(coll.onWall && !Input.GetButton("Jump"))
         {
             if (x != 0 && !wallGrab)
             {
@@ -108,14 +114,43 @@ public class Movement : MonoBehaviour
         if (!coll.onWall || coll.onGround)
             wallSlide = false;
 
+        if (!hasJumped && !coll.onGround && !coyoteBuffer && !coyoteTriggered)
+        {
+            StartCoroutine(CoyoteTime());
+        }
+
         if (Input.GetButtonDown("Jump"))
         {
             anim.SetTrigger("jump");
 
             if (coll.onGround)
                 Jump(Vector2.up, false);
+            else
+            {
+                if (coyoteBuffer)
+                {
+                    Jump(Vector2.up, false);
+                    coyoteBuffer = false;
+                } 
+                else
+                {
+                    StopCoroutine(JumpBuffer());
+                    StartCoroutine(JumpBuffer());
+                }
+            }
+                
             if (coll.onWall && !coll.onGround)
                 WallJump();
+        }
+
+        if (coll.onGround && jumpBuffer)
+        {
+            anim.SetTrigger("jump");
+            if (coll.onGround)
+            {
+                Jump(Vector2.up, false);
+                jumpBuffer = false;
+            }
         }
 
         if (Input.GetButtonDown("Fire1") && !hasDashed)
@@ -158,6 +193,9 @@ public class Movement : MonoBehaviour
     {
         hasDashed = false;
         isDashing = false;
+        hasJumped = false;
+        coyoteBuffer = false;
+        coyoteTriggered = false;
 
         side = anim.sr.flipX ? -1 : 1;
 
@@ -183,7 +221,7 @@ public class Movement : MonoBehaviour
 
     IEnumerator DashWait()
     {
-        FindObjectOfType<GhostTrail>().ShowGhost();
+        FindObjectOfType<GhostTrailNew>().ShowGhost();
         StartCoroutine(GroundDash());
         DOVirtual.Float(14, 0, .8f, RigidbodyDrag);
 
@@ -253,6 +291,12 @@ public class Movement : MonoBehaviour
         if (wallGrab)
             return;
 
+        if (coll.onLeftWall && dir.x < 0)
+            return;
+
+        if (coll.onRightWall && dir.x > 0)
+            return;
+
         if (!wallJumped)
         {
             rb.velocity = new Vector2(dir.x * speed, rb.velocity.y);
@@ -271,6 +315,8 @@ public class Movement : MonoBehaviour
         rb.velocity = new Vector2(rb.velocity.x, 0);
         rb.velocity += dir * jumpForce;
 
+        hasJumped = true;
+
         particle.Play();
     }
 
@@ -279,6 +325,21 @@ public class Movement : MonoBehaviour
         canMove = false;
         yield return new WaitForSeconds(time);
         canMove = true;
+    }
+
+    IEnumerator JumpBuffer()
+    {
+        jumpBuffer = true;
+        yield return new WaitForSeconds(bufferTime);
+        jumpBuffer = false;
+    }
+
+    IEnumerator CoyoteTime()
+    {
+        coyoteBuffer = true;
+        yield return new WaitForSeconds(coyoteTime);
+        coyoteBuffer = false;
+        coyoteTriggered = true;
     }
 
     void RigidbodyDrag(float x)
